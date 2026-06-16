@@ -3,6 +3,7 @@ import type { Avatar, FeedbackItem, RetroStation } from "../../types/domain";
 import { FeedbackComposer } from "../retro/FeedbackComposer";
 
 type PartyMapProps = {
+  sessionTitle: string;
   displayName: string;
   avatar: Avatar;
   feedbacks: FeedbackItem[];
@@ -46,6 +47,7 @@ const stationIcons = {
 };
 
 export function PartyMap({
+  sessionTitle,
   displayName,
   avatar,
   feedbacks,
@@ -58,7 +60,7 @@ export function PartyMap({
       <header className="party-header">
         <div>
           <p className="eyebrow">Festa aberta</p>
-          <h1>Arraia da sprint</h1>
+          <h1>{sessionTitle}</h1>
         </div>
         <div className="participant-pill">
           <span className="mini-avatar" style={{ backgroundColor: avatar.color }} />
@@ -95,7 +97,7 @@ export function PartyMap({
       <aside className="feedback-board">
         <div>
           <p className="eyebrow">Mural da retro</p>
-          <h2>Feedbacks locais</h2>
+          <h2>Feedbacks da sessao</h2>
         </div>
         {feedbacks.length === 0 ? (
           <p className="empty-state">

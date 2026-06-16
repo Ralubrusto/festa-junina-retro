@@ -3,12 +3,14 @@ import type { FormEvent } from "react";
 import { Sparkles } from "lucide-react";
 
 type EntryScreenProps = {
+  sessionTitle: string;
   isLoading: boolean;
   errorMessage: string | null;
   onSubmit: (displayName: string) => void;
 };
 
 export function EntryScreen({
+  sessionTitle,
   isLoading,
   errorMessage,
   onSubmit,
@@ -33,7 +35,7 @@ export function EntryScreen({
           <Sparkles size={18} />
           Retro junina
         </div>
-        <h1>Arraia da sprint</h1>
+        <h1>{sessionTitle}</h1>
         <p>
           Entre na festa, monte seu personagem e deixe feedbacks para guiar a
           conversa do time.

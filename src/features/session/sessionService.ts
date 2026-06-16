@@ -3,6 +3,7 @@ import {
   addDoc,
   collection,
   doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -11,17 +12,55 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { auth, db } from "../../lib/firebase";
-import type { Avatar, FeedbackItem, Participant } from "../../types/domain";
-
-const DEFAULT_SESSION_ID = "demo-sprint";
+import type {
+  Avatar,
+  FeedbackItem,
+  Participant,
+  RetroSession,
+} from "../../types/domain";
 
 export async function signInParticipant(
+  session: RetroSession,
   displayName: string,
   avatar: Avatar,
 ): Promise<Participant> {
   const credentials = auth.currentUser
     ? { user: auth.currentUser }
     : await signInAnonymously(auth);
+  const participantRef = doc(
+    db,
+    "sessions",
+    session.id,
+    "participants",
+    credentials.user.uid,
+  );
+  await ensureSession(session);
+
+  const participantSnapshot = await getDoc(participantRef);
+
+  if (participantSnapshot.exists()) {
+    const savedParticipant = participantSnapshot.data();
+    const participant: Participant = {
+      id: credentials.user.uid,
+      displayName: savedParticipant.displayName ?? displayName,
+      avatar: savedParticipant.avatar ?? avatar,
+    };
+
+    await setDoc(
+      participantRef,
+      {
+        displayName,
+        lastSeenAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+
+    return {
+      ...participant,
+      displayName,
+    };
+  }
 
   const participant: Participant = {
     id: credentials.user.uid,
@@ -29,9 +68,8 @@ export async function signInParticipant(
     avatar,
   };
 
-  await ensureDefaultSession();
   await setDoc(
-    doc(db, "sessions", DEFAULT_SESSION_ID, "participants", participant.id),
+    participantRef,
     {
       displayName: participant.displayName,
       avatar: participant.avatar,
@@ -44,9 +82,12 @@ export async function signInParticipant(
   return participant;
 }
 
-export async function updateParticipantAvatar(participant: Participant) {
+export async function updateParticipantAvatar(
+  session: RetroSession,
+  participant: Participant,
+) {
   await setDoc(
-    doc(db, "sessions", DEFAULT_SESSION_ID, "participants", participant.id),
+    doc(db, "sessions", session.id, "participants", participant.id),
     {
       avatar: participant.avatar,
       updatedAt: serverTimestamp(),
@@ -56,11 +97,12 @@ export async function updateParticipantAvatar(participant: Participant) {
 }
 
 export async function createFeedback(
+  session: RetroSession,
   participant: Participant,
   category: FeedbackItem["category"],
   text: string,
 ) {
-  await addDoc(collection(db, "sessions", DEFAULT_SESSION_ID, "feedbacks"), {
+  await addDoc(collection(db, "sessions", session.id, "feedbacks"), {
     category,
     text,
     authorId: participant.id,
@@ -75,10 +117,11 @@ export async function createFeedback(
 }
 
 export function subscribeToFeedbacks(
+  session: RetroSession,
   onFeedbacksChange: (feedbacks: FeedbackItem[]) => void,
 ): Unsubscribe {
   const feedbacksQuery = query(
-    collection(db, "sessions", DEFAULT_SESSION_ID, "feedbacks"),
+    collection(db, "sessions", session.id, "feedbacks"),
     orderBy("createdAt", "desc"),
   );
 
@@ -99,13 +142,25 @@ export function subscribeToFeedbacks(
   });
 }
 
-async function ensureDefaultSession() {
-  await setDoc(
-    doc(db, "sessions", DEFAULT_SESSION_ID),
-    {
-      title: "Demo sprint",
+async function ensureSession(session: RetroSession) {
+  const sessionRef = doc(db, "sessions", session.id);
+  const sessionSnapshot = await getDoc(sessionRef);
+
+  if (!sessionSnapshot.exists()) {
+    await setDoc(sessionRef, {
+      title: session.title,
       status: "open",
       createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    return;
+  }
+
+  await setDoc(
+    sessionRef,
+    {
+      title: session.title,
       updatedAt: serverTimestamp(),
     },
     { merge: true },

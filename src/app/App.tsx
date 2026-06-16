@@ -8,6 +8,7 @@ import {
   subscribeToFeedbacks,
   updateParticipantAvatar,
 } from "../features/session/sessionService";
+import { getInitialSession } from "../features/session/sessionRouting";
 import type {
   AppStep,
   Avatar,
@@ -23,6 +24,7 @@ const defaultAvatar: Avatar = {
 };
 
 function App() {
+  const [session] = useState(getInitialSession);
   const [step, setStep] = useState<AppStep>("entry");
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [avatar, setAvatar] = useState<Avatar>(defaultAvatar);
@@ -35,18 +37,23 @@ function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = subscribeToFeedbacks(setFeedbacks);
+    const unsubscribe = subscribeToFeedbacks(session, setFeedbacks);
 
     return () => unsubscribe();
-  }, []);
+  }, [session]);
 
   async function handleEnter(displayName: string) {
     setIsEntering(true);
     setErrorMessage(null);
 
     try {
-      const signedParticipant = await signInParticipant(displayName, avatar);
+      const signedParticipant = await signInParticipant(
+        session,
+        displayName,
+        avatar,
+      );
       setParticipant(signedParticipant);
+      setAvatar(signedParticipant.avatar);
       setStep("avatar");
     } catch (error) {
       console.error(error);
@@ -70,7 +77,7 @@ function App() {
     };
 
     try {
-      await updateParticipantAvatar(updatedParticipant);
+      await updateParticipantAvatar(session, updatedParticipant);
       setParticipant(updatedParticipant);
       setStep("party");
     } catch (error) {
@@ -87,7 +94,12 @@ function App() {
     }
 
     try {
-      await createFeedback(participant, selectedStation.category, text);
+      await createFeedback(
+        session,
+        participant,
+        selectedStation.category,
+        text,
+      );
       setSelectedStation(null);
     } catch (error) {
       console.error(error);
@@ -112,6 +124,7 @@ function App() {
   if (step === "entry") {
     return (
       <EntryScreen
+        sessionTitle={session.title}
         isLoading={isEntering}
         errorMessage={errorMessage}
         onSubmit={handleEnter}
@@ -135,6 +148,7 @@ function App() {
   if (step === "party" && participant) {
     return (
       <PartyMap
+        sessionTitle={session.title}
         displayName={participant.displayName}
         avatar={participant.avatar}
         feedbacks={feedbacks}
