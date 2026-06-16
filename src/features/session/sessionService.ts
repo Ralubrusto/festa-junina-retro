@@ -17,22 +17,31 @@ import type {
   FeedbackItem,
   Participant,
   RetroSession,
+  SessionStatus,
 } from "../../types/domain";
+
+export async function ensureAnonymousAuth() {
+  if (auth.currentUser) {
+    return auth.currentUser;
+  }
+
+  const credentials = await signInAnonymously(auth);
+
+  return credentials.user;
+}
 
 export async function signInParticipant(
   session: RetroSession,
   displayName: string,
   avatar: Avatar,
 ): Promise<Participant> {
-  const credentials = auth.currentUser
-    ? { user: auth.currentUser }
-    : await signInAnonymously(auth);
+  const user = await ensureAnonymousAuth();
   const participantRef = doc(
     db,
     "sessions",
     session.id,
     "participants",
-    credentials.user.uid,
+    user.uid,
   );
   await ensureSession(session);
 
@@ -41,7 +50,7 @@ export async function signInParticipant(
   if (participantSnapshot.exists()) {
     const savedParticipant = participantSnapshot.data();
     const participant: Participant = {
-      id: credentials.user.uid,
+      id: user.uid,
       displayName: savedParticipant.displayName ?? displayName,
       avatar: savedParticipant.avatar ?? avatar,
     };
@@ -63,7 +72,7 @@ export async function signInParticipant(
   }
 
   const participant: Participant = {
-    id: credentials.user.uid,
+    id: user.uid,
     displayName,
     avatar,
   };
@@ -136,10 +145,89 @@ export function subscribeToFeedbacks(
           text: data.text,
           authorName: data.authorName,
           createdAt: data.createdAtLabel ?? "",
+          hiddenByAdmin: data.hiddenByAdmin ?? false,
         };
       }),
     );
   });
+}
+
+export function subscribeToSession(
+  session: RetroSession,
+  onSessionChange: (session: RetroSession) => void,
+): Unsubscribe {
+  void ensureSession(session);
+
+  return onSnapshot(doc(db, "sessions", session.id), (snapshot) => {
+    const data = snapshot.data();
+
+    onSessionChange({
+      id: session.id,
+      title: data?.title ?? session.title,
+      status: data?.status ?? session.status,
+    });
+  });
+}
+
+export function subscribeToParticipants(
+  session: RetroSession,
+  onParticipantsChange: (participants: Participant[]) => void,
+): Unsubscribe {
+  return onSnapshot(
+    collection(db, "sessions", session.id, "participants"),
+    (snapshot) => {
+      const participants = snapshot.docs
+        .map((participantDoc) => {
+          const data = participantDoc.data();
+
+          return {
+            id: participantDoc.id,
+            displayName: data.displayName,
+            avatar: data.avatar,
+          };
+        })
+        .filter((participant): participant is Participant =>
+          Boolean(participant.displayName && participant.avatar),
+        )
+        .sort((firstParticipant, secondParticipant) =>
+          firstParticipant.displayName.localeCompare(
+            secondParticipant.displayName,
+            "pt-BR",
+          ),
+        );
+
+      onParticipantsChange(participants);
+    },
+  );
+}
+
+export async function updateFeedbackVisibility(
+  session: RetroSession,
+  feedbackId: string,
+  hiddenByAdmin: boolean,
+) {
+  await setDoc(
+    doc(db, "sessions", session.id, "feedbacks", feedbackId),
+    {
+      hiddenByAdmin,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+
+export async function updateSessionStatus(
+  session: RetroSession,
+  status: SessionStatus,
+) {
+  await setDoc(
+    doc(db, "sessions", session.id),
+    {
+      status,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
 }
 
 async function ensureSession(session: RetroSession) {
@@ -154,15 +242,5 @@ async function ensureSession(session: RetroSession) {
       updatedAt: serverTimestamp(),
     });
 
-    return;
   }
-
-  await setDoc(
-    sessionRef,
-    {
-      title: session.title,
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
 }

@@ -1,15 +1,25 @@
 import { Flame, Fish, Mail, PartyPopper } from "lucide-react";
-import type { Avatar, FeedbackItem, RetroStation } from "../../types/domain";
+import type {
+  Avatar,
+  FeedbackItem,
+  Participant,
+  RetroStation,
+  SessionStatus,
+} from "../../types/domain";
 import { FeedbackComposer } from "../retro/FeedbackComposer";
 
 type PartyMapProps = {
   sessionTitle: string;
+  sessionStatus: SessionStatus;
+  currentParticipantId: string;
   displayName: string;
   avatar: Avatar;
+  participants: Participant[];
   feedbacks: FeedbackItem[];
   selectedStation: RetroStation | null;
   onSelectStation: (station: RetroStation | null) => void;
   onCreateFeedback: (text: string) => void;
+  onOpenAdmin: () => void;
 };
 
 const stations: RetroStation[] = [
@@ -48,13 +58,19 @@ const stationIcons = {
 
 export function PartyMap({
   sessionTitle,
+  sessionStatus,
+  currentParticipantId,
   displayName,
   avatar,
+  participants,
   feedbacks,
   selectedStation,
   onSelectStation,
   onCreateFeedback,
+  onOpenAdmin,
 }: PartyMapProps) {
+  const isClosed = sessionStatus === "closed";
+
   return (
     <main className="party-layout">
       <header className="party-header">
@@ -62,14 +78,47 @@ export function PartyMap({
           <p className="eyebrow">Festa aberta</p>
           <h1>{sessionTitle}</h1>
         </div>
-        <div className="participant-pill">
-          <span className="mini-avatar" style={{ backgroundColor: avatar.color }} />
-          <span>{displayName}</span>
+        <div className="party-header-actions">
+          <div className="participant-pill">
+            <span
+              className="mini-avatar"
+              style={{ backgroundColor: avatar.color }}
+            />
+            <span>{displayName}</span>
+          </div>
+          <div className="participant-count">
+            {participants.length} participantes
+          </div>
+          <button type="button" className="admin-link" onClick={onOpenAdmin}>
+            Admin
+          </button>
         </div>
       </header>
 
       <section className="party-yard">
         <div className="flag-line" />
+        <div className="participant-circle" aria-label="Participantes na festa">
+          {participants.length === 0 ? (
+            <p className="empty-state">Participantes aparecerão aqui.</p>
+          ) : (
+            participants.map((participant) => (
+              <div
+                key={participant.id}
+                className={
+                  participant.id === currentParticipantId
+                    ? "party-participant current"
+                    : "party-participant"
+                }
+              >
+                <span
+                  className="party-avatar"
+                  style={{ backgroundColor: participant.avatar.color }}
+                />
+                <span>{participant.displayName}</span>
+              </div>
+            ))
+          )}
+        </div>
         <div className="station-grid">
           {stations.map((station) => {
             const Icon = stationIcons[station.category];
@@ -82,6 +131,7 @@ export function PartyMap({
                 key={station.category}
                 type="button"
                 className={`station station-${station.category}`}
+                disabled={isClosed}
                 onClick={() => onSelectStation(station)}
               >
                 <Icon size={28} />
@@ -99,6 +149,11 @@ export function PartyMap({
           <p className="eyebrow">Mural da retro</p>
           <h2>Feedbacks da sessao</h2>
         </div>
+        {isClosed ? (
+          <p className="session-closed-message">
+            A sessao foi encerrada pelo admin.
+          </p>
+        ) : null}
         {feedbacks.length === 0 ? (
           <p className="empty-state">
             Clique em uma barraca para registrar o primeiro feedback.

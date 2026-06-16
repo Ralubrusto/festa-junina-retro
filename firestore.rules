@@ -1,0 +1,50 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email == "ralubrusto.27@gmail.com";
+    }
+
+    function sessionPath(sessionId) {
+      return /databases/$(database)/documents/sessions/$(sessionId);
+    }
+
+    function sessionIsOpen(sessionId) {
+      return exists(sessionPath(sessionId))
+        && get(sessionPath(sessionId)).data.status == "open";
+    }
+
+    match /sessions/{sessionId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.status == "open";
+      allow update: if isAdmin();
+      allow delete: if false;
+
+      match /participants/{participantId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn()
+          && request.auth.uid == participantId;
+        allow delete: if false;
+      }
+
+      match /feedbacks/{feedbackId} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && sessionIsOpen(sessionId)
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.hiddenByAdmin == false;
+        allow update: if isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["hiddenByAdmin", "updatedAt"]);
+        allow delete: if false;
+      }
+    }
+  }
+}

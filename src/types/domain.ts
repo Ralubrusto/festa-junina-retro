@@ -1,6 +1,6 @@
 export type FeedbackCategory = "positive" | "negative" | "thanks" | "action";
 
-export type AppStep = "entry" | "avatar" | "party";
+export type AppStep = "entry" | "avatar" | "party" | "admin";
 
 export type SessionStatus = "open" | "review" | "closed";
 
@@ -28,6 +28,7 @@ export type FeedbackItem = {
   text: string;
   authorName: string;
   createdAt: string;
+  hiddenByAdmin: boolean;
 };
 
 export type RetroStation = {
