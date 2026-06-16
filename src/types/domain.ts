@@ -1,5 +1,7 @@
 export type FeedbackCategory = "positive" | "negative" | "thanks" | "action";
 
+export type AppStep = "entry" | "avatar" | "party";
+
 export type Avatar = {
   outfit: string;
   accessory: string;
@@ -18,4 +20,11 @@ export type FeedbackItem = {
   text: string;
   authorName: string;
   createdAt: string;
+};
+
+export type RetroStation = {
+  category: FeedbackCategory;
+  title: string;
+  description: string;
+  cta: string;
 };
